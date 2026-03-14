@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel — Security Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        :root{
+          --accent:#4269f5;--accent-dk:#2f52d4;--accent-lt:rgba(66,105,245,0.1);
+          --bg:#070a13;--surface:#0d1120;--surface2:#111827;--surface3:#161e30;
+          --border:#1a2236;--border2:#212d45;
+          --text:#dce6f8;--muted:#5a6d94;--muted2:#3d4f6e;
+          --critical:#ef4444;--high:#f97316;--medium:#eab308;--success:#22c55e;
+          --critical-lt:rgba(239,68,68,0.1);--high-lt:rgba(249,115,22,0.1);
+          --medium-lt:rgba(234,179,8,0.1);--success-lt:rgba(34,197,94,0.08);
+        }
+        body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;font-size:13px;}
+
+        /* ═══════════ SCROLLBAR ═══════════ */
+        ::-webkit-scrollbar{width:4px;height:4px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+        /* ═══════════ LOGIN ═══════════ */
+        #login-page{
+          display:flex;align-items:center;justify-content:center;min-height:100vh;
+          background:var(--bg);
+          background-image:radial-gradient(circle at 25% 30%, rgba(66,105,245,0.06) 0%, transparent 50%),
+                           radial-gradient(circle at 75% 70%, rgba(66,105,245,0.04) 0%, transparent 50%),
+                           linear-gradient(rgba(66,105,245,0.03) 1px,transparent 1px),
+                           linear-gradient(90deg,rgba(66,105,245,0.03) 1px,transparent 1px);
+          background-size:100% 100%,100% 100%,36px 36px,36px 36px;
+        }
+        .login-card{
+          background:var(--surface);border:1px solid var(--border2);
+          border-radius:14px;padding:44px 40px;width:400px;
+          box-shadow:0 32px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(66,105,245,0.08);
+        }
+        .login-logo{display:flex;align-items:center;gap:14px;margin-bottom:6px;justify-content:center;}
+        .login-shield{width:44px;height:44px;background:var(--accent);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);box-shadow:0 0 24px rgba(66,105,245,0.4);}
+        .login-brand{font-family:'Space Mono',monospace;font-size:22px;letter-spacing:4px;}
+        .login-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:32px;letter-spacing:0.5px;}
+        .login-field{margin-bottom:18px;}
+        .login-label{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;font-family:'Space Mono',monospace;display:block;margin-bottom:7px;}
+        .login-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:11px 14px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:all 0.2s;}
+        .login-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(66,105,245,0.12);}
+        .login-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:7px;padding:13px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:1px;transition:all 0.2s;margin-top:6px;font-family:'DM Sans',sans-serif;}
+        .login-btn:hover{background:var(--accent-dk);box-shadow:0 4px 20px rgba(66,105,245,0.3);}
+        .login-error{font-size:11px;color:var(--critical);text-align:center;margin-top:12px;display:none;font-family:'Space Mono',monospace;}
+
+        /* ═══════════ APP LAYOUT ═══════════ */
+        #app{display:none;min-height:100vh;}
+
+        /* ═══════════ SIDEBAR ═══════════ */
+        .sidebar{
+          width:224px;min-height:100vh;background:var(--surface);
+          border-right:1px solid var(--border);position:fixed;
+          top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:50;
+        }
+        .logo{padding:22px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+        .logo-shield{width:30px;height:30px;background:var(--accent);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);flex-shrink:0;}
+        .logo-text{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;letter-spacing:2.5px;}
+        nav{padding:14px 10px;flex:1;}
+        .nav-label{font-size:9px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase;padding:8px 10px 4px;font-family:'Space Mono',monospace;}
+        .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;color:var(--muted);font-size:12.5px;font-weight:500;cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:all 0.15s;margin-bottom:1px;letter-spacing:0.2px;}
+        .nav-item:hover{background:var(--surface2);color:var(--text);}
+        .nav-item.active{background:var(--accent-lt);color:var(--accent);border-left:2px solid var(--accent);padding-left:8px;}
+        .nav-item svg{width:14px;height:14px;flex-shrink:0;opacity:0.8;}
+        .nav-item.active svg{opacity:1;}
+        .sidebar-footer{padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+        .admin-ava{width:34px;height:34px;background:var(--accent-lt);border:1px solid rgba(66,105,245,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--accent);font-weight:700;flex-shrink:0;}
+        .admin-info{flex:1;overflow:hidden;}
+        .admin-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .admin-role{font-size:10px;color:var(--muted);letter-spacing:0.3px;}
+        .pulse{width:6px;height:6px;background:var(--success);border-radius:50%;animation:pulse 2s ease-in-out infinite;}
+        @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.8);}}
+
+        /* ═══════════ MAIN CONTENT ═══════════ */
+        .main{margin-left:224px;padding:26px 28px;min-height:100vh;width:calc(100% - 224px);}
+        .page{display:none;animation:fadeUp 0.18s ease;}
+        .page.active{display:block;}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+        .page-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;}
+        .page-title{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;letter-spacing:0.5px;}
+        .page-sub{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:0.3px;}
+        .clock-chip{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:6px 12px;border-radius:5px;}
+
+        /* ═══════════ STAT CARDS ═══════════ */
+        .cards-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+        .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.15s;}
+        .stat-card:hover{border-color:var(--c,var(--accent));transform:translateY(-2px);}
+        .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--c,var(--accent));}
+        .stat-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle at top right, rgba(var(--cr),0.06) 0%, transparent 70%);pointer-events:none;}
+        .stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;font-family:'Space Mono',monospace;margin-bottom:10px;}
+        .stat-val{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;color:var(--c,var(--accent));line-height:1;}
+        .stat-ico{position:absolute;right:14px;top:14px;width:26px;height:26px;border-radius:5px;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;color:var(--c,var(--muted));}
+        .stat-ico svg{width:13px;height:13px;}
+
+        /* ═══════════ PANELS ═══════════ */
+        .panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;}
+        .panel-hd{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface2);}
+        .panel-title{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text);}
+        .panel-body{padding:16px;}
+        .chart-box{position:relative;height:176px;}
+        .badge-pill{font-size:9px;padding:2px 8px;border-radius:20px;font-family:'Space Mono',monospace;font-weight:700;letter-spacing:0.5px;}
+        .bp-accent{background:var(--accent-lt);color:var(--accent);border:1px solid rgba(66,105,245,0.2);}
+        .bp-success{background:var(--success-lt);color:var(--success);border:1px solid rgba(34,197,94,0.2);}
+        .bp-critical{background:var(--critical-lt);color:var(--critical);border:1px solid rgba(239,68,68,0.2);}
+        .bp-muted{background:rgba(107,122,158,0.08);color:var(--muted);border:1px solid var(--border);}
+
+        /* ═══════════ FILTER BAR ═══════════ */
+        .filter-bar{
+          display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+          padding:10px 16px;border-bottom:1px solid var(--border);
+          background:rgba(10,14,28,0.6);
+        }
+        .filter-bar-label{
+          font-size:9px;font-family:'Space Mono',monospace;
+          color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;
+          white-space:nowrap;padding-right:4px;
+        }
+        .f-input,.f-select{
+          background:var(--surface2);border:1px solid var(--border2);
+          color:var(--text);padding:6px 11px;border-radius:5px;
+          font-size:11px;font-family:'DM Sans',sans-serif;outline:none;
+          transition:border-color 0.15s;height:30px;
+        }
+        .f-input{min-width:160px;}
+        .f-input::placeholder{color:var(--muted2);}
+        .f-select{cursor:pointer;padding-right:8px;}
+        .f-input:focus,.f-select:focus{border-color:var(--accent);}
+        .f-select option{background:var(--surface2);color:var(--text);}
+        .f-sep{width:1px;height:16px;background:var(--border2);margin:0 2px;flex-shrink:0;}
+        .f-count{
+          margin-left:auto;font-size:9px;font-family:'Space Mono',monospace;
+          color:var(--muted);background:var(--surface2);
+          border:1px solid var(--border);padding:3px 9px;border-radius:4px;white-space:nowrap;
+        }
+
+        /* ═══════════ TABLES ═══════════ */
+        .tbl-wrap{overflow-x:auto;}
+        table{width:100%;border-collapse:collapse;}
+        th{
+          padding:8px 14px;text-align:left;font-size:9px;
+          font-family:'Space Mono',monospace;letter-spacing:1px;text-transform:uppercase;
+          color:var(--muted);border-bottom:1px solid var(--border);font-weight:400;
+          background:var(--surface2);white-space:nowrap;
+        }
+        td{padding:10px 14px;border-bottom:1px solid rgba(26,34,54,0.8);font-size:12px;white-space:nowrap;}
+        tr:last-child td{border-bottom:none;}
+        tr:hover td{background:rgba(255,255,255,0.02);cursor:pointer;}
+        .ip-mono{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);}
+        .ep-mono{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);}
+        .tdim{color:var(--muted);font-size:11px;}
+
+        /* ═══════════ SEVERITY BADGES ═══════════ */
+        .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:9px;font-family:'Space Mono',monospace;font-weight:700;letter-spacing:0.5px;}
+        .b-critical{background:var(--critical-lt);color:var(--critical);border:1px solid rgba(239,68,68,0.25);}
+        .b-high{background:var(--high-lt);color:var(--high);border:1px solid rgba(249,115,22,0.25);}
+        .b-medium{background:var(--medium-lt);color:var(--medium);border:1px solid rgba(234,179,8,0.25);}
+        .b-success{background:var(--success-lt);color:var(--success);border:1px solid rgba(34,197,94,0.2);}
+        .b-muted{background:rgba(107,122,158,0.08);color:var(--muted);border:1px solid var(--border);}
+
+        /* ═══════════ GRID LAYOUTS ═══════════ */
+        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+        .grid-32{display:grid;grid-template-columns:2fr 1.2fr;gap:14px;margin-bottom:14px;}
+
+        /* ═══════════ TOP ENDPOINTS ═══════════ */
+        .ep-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+        .ep-name{font-family:'Space Mono',monospace;font-size:9.5px;color:var(--muted);width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .ep-track{flex:1;height:3px;background:var(--surface3);border-radius:2px;}
+        .ep-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.8s ease;}
+        .ep-num{font-family:'Space Mono',monospace;font-size:10px;color:var(--text);width:24px;text-align:right;}
+
+        /* ═══════════ UNBLOCK BOX ═══════════ */
+        .unblock-box{
+          background:var(--surface);border:1px solid var(--border2);
+          border-radius:10px;padding:18px 22px;margin-bottom:16px;
+          display:flex;align-items:center;gap:0;
+          position:relative;overflow:hidden;
+        }
+        .unblock-box::before{
+          content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+          background:var(--accent);
+        }
+        .unblock-left{padding-left:12px;flex:1;display:flex;align-items:center;gap:20px;}
+        .unblock-lbl{font-size:9px;font-family:'Space Mono',monospace;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+        .unblock-ip{
+          font-family:'Space Mono',monospace;font-size:15px;color:var(--accent);
+          font-weight:700;padding:7px 14px;background:var(--accent-lt);
+          border:1px solid rgba(66,105,245,0.25);border-radius:6px;
+          min-width:180px;display:inline-block;
+        }
+        .unblock-right{display:flex;align-items:center;gap:14px;}
+        .btn-unblock{
+          padding:9px 18px;border-radius:6px;font-size:12px;cursor:pointer;
+          background:rgba(239,68,68,0.1);color:var(--critical);
+          border:1px solid rgba(239,68,68,0.25);font-family:'DM Sans',sans-serif;
+          font-weight:600;transition:all 0.15s;letter-spacing:0.3px;
+          display:flex;align-items:center;gap:6px;
+        }
+        .btn-unblock:hover:not(:disabled){background:rgba(239,68,68,0.18);border-color:rgba(239,68,68,0.4);}
+        .btn-unblock:disabled{opacity:0.35;cursor:not-allowed;}
+        .unblock-msg{font-size:11px;font-family:'Space Mono',monospace;}
+
+        /* ═══════════ ROW SELECTION ═══════════ */
+        .row-sel td{background:rgba(66,105,245,0.07)!important;}
+        .row-sel td:first-child{border-left:2px solid var(--accent);}
+        .geo-sel td{background:rgba(66,105,245,0.07)!important;}
+        .geo-sel td:first-child{border-left:2px solid var(--accent);}
+
+        /* ═══════════ GEO MAP ═══════════ */
+        .map-wrap{height:420px;position:relative;}
+        #leaflet-map{width:100%;height:100%;}
+        .map-controls{display:flex;align-items:center;gap:8px;}
+        .map-btn{background:var(--surface2);color:var(--muted);border:1px solid var(--border);padding:3px 10px;border-radius:4px;font-size:10px;cursor:pointer;font-family:'Space Mono',monospace;transition:all 0.15s;}
+        .map-btn:hover{color:var(--text);border-color:var(--border2);}
+        .map-btn.active-map{background:var(--accent-lt);color:var(--accent);border-color:rgba(66,105,245,0.3);}
+        .leaflet-popup-content-wrapper{background:#0d1120!important;border:1px solid #4269f5!important;border-radius:7px!important;box-shadow:0 8px 28px rgba(0,0,0,0.7)!important;color:#dce6f8!important;}
+        .leaflet-popup-tip{background:#0d1120!important;}
+        .leaflet-popup-close-button{color:#5a6d94!important;top:7px!important;right:9px!important;}
+        .mp-ip{font-family:'Space Mono',monospace;font-size:12px;color:#4269f5;font-weight:700;margin-bottom:6px;}
+        .mp-row{font-size:11px;color:#5a6d94;margin-bottom:3px;}
+        .mp-row span{color:#dce6f8;}
+
+        /* ── BACKGROUND & GLASS EFFECT ── */
+        body {
+            background-image: url('/sentinelBackground.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 8, 18, 0.87);
+            z-index: 0;
+            pointer-events: none;
+        }
+        #login-page, #app { position: relative; z-index: 1; }
+        #login-page {
+            background: transparent !important;
+            background-image: none !important;
+        }
+        .login-card {
+            background: rgba(10, 14, 26, 0.92) !important;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(66,105,245,0.2) !important;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(66,105,245,0.1) !important;
+        }
+        .sidebar {
+            background: rgba(10, 14, 26, 0.95) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right-color: rgba(30, 38, 64, 0.6) !important;
+        }
+        .panel {
+            background: rgba(13, 17, 32, 0.82) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .panel-hd {
+            background: rgba(15, 20, 38, 0.88) !important;
+        }
+        .stat-card {
+            background: rgba(13, 17, 32, 0.82) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .unblock-box {
+            background: rgba(13, 17, 32, 0.82) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .filter-bar {
+            background: rgba(8, 11, 22, 0.7) !important;
+        }
+        .main {
+            background: transparent;
+        }
+
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN ═══════════════════ -->
+<div id="login-page">
+    <div class="login-card">
+        <div class="login-logo" style="flex-direction:column;gap:8px;">
+            <img src="/sentinelLogo.png" alt="Sentinel" style="width:130px;height:130px;object-fit:contain;">
+        </div>
+        <div class="login-sub" style="font-size:11px;letter-spacing:0.5px;">Backend Security Dashboard</div>
+        <div class="login-field">
+            <label class="login-label">Username</label>
+            <input class="login-input" type="text" id="lu" placeholder="Enter username" autocomplete="off">
+        </div>
+        <div class="login-field">
+            <label class="login-label">Password</label>
+            <input class="login-input" type="password" id="lp" placeholder="Enter password">
+        </div>
+        <button class="login-btn" onclick="doLogin()">Sign In →</button>
+        <div class="login-error" id="lerr">⚠ Invalid credentials</div>
+    </div>
+</div>
+
+<!-- ═══════════════════ APP ═══════════════════ -->
+<div id="app">
+    <aside class="sidebar">
+        <div class="logo">
+            <img src="/sentinelLogo.png" alt="Sentinel" style="width:40px;height:40px;object-fit:contain;flex-shrink:0;border-radius:6px;">
+            <span class="logo-text">SENTINEL</span>
+        </div>
+        <nav>
+            <div class="nav-label">Monitor</div>
+            <button class="nav-item active" onclick="showPage('dashboard',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Dashboard
+            </button>
+            <button class="nav-item" onclick="showPage('requests',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Requests
+            </button>
+            <div class="nav-label" style="margin-top:8px">Manage</div>
+            <button class="nav-item" onclick="showPage('blocked',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                Blocked IPs
+            </button>
+            <button class="nav-item" onclick="showPage('security',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Security Alerts
+            </button>
+            <button class="nav-item" onclick="showPage('geomap',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                Geo Map
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="admin-ava" id="admin-ava">A</div>
+            <div class="admin-info">
+                <div class="admin-name" id="admin-name">Admin</div>
+                <div class="admin-role">Administrator</div>
+            </div>
+            <div class="pulse"></div>
+        </div>
+    </aside>
+
+    <main class="main">
+
+        <!-- ══════ DASHBOARD ══════ -->
+        <div class="page active" id="page-dashboard">
+            <div class="page-hdr">
+                <div><div class="page-title">Dashboard</div><div class="page-sub">Real-time security overview for NExT exam portal</div></div>
+                <div class="clock-chip" id="clock">--:--:--</div>
+            </div>
+            <div class="cards-row">
+                <div class="stat-card" style="--c:#4269f5;--cr:66,105,245">
+                    <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+                    <div class="stat-lbl">Total Requests</div><div class="stat-val" id="s-req">—</div>
+                </div>
+                <div class="stat-card" style="--c:#ef4444;--cr:239,68,68">
+                    <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div>
+                    <div class="stat-lbl">Failed Requests</div><div class="stat-val" id="s-fail">—</div>
+                </div>
+                <div class="stat-card" style="--c:#f97316;--cr:249,115,22">
+                    <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div>
+                    <div class="stat-lbl">Active Alerts</div><div class="stat-val" id="s-alert">—</div>
+                </div>
+                <div class="stat-card" style="--c:#22c55e;--cr:34,197,94">
+                    <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+                    <div class="stat-lbl">Blocked IPs</div><div class="stat-val" id="s-block">—</div>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="panel">
+                    <div class="panel-hd"><span class="panel-title">Requests Per Minute</span><span class="badge-pill bp-accent">LIVE</span></div>
+                    <div class="panel-body"><div class="chart-box"><canvas id="reqChart"></canvas></div></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-hd"><span class="panel-title">Recent Blocked IPs</span></div>
+                    <div class="tbl-wrap"><table>
+                        <thead><tr><th>IP Address</th><th>Blocked Till</th><th>Status</th></tr></thead>
+                        <tbody id="tb-recent"><tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                    </table></div>
+                </div>
+            </div>
+            <div class="grid-32">
+                <div class="panel"><div class="panel-hd"><span class="panel-title">Top Endpoints</span></div><div class="panel-body" id="ep-list"></div></div>
+                <div class="panel"><div class="panel-hd"><span class="panel-title">Endpoint Usage</span></div><div class="panel-body"><div class="chart-box"><canvas id="epChart"></canvas></div></div></div>
+            </div>
+        </div>
+
+        <!-- ══════ REQUESTS ══════ -->
+        <div class="page" id="page-requests">
+            <div class="page-hdr"><div><div class="page-title">Requests</div><div class="page-sub">All incoming API requests</div></div></div>
+
+            <!-- Success requests -->
+            <div class="panel">
+                <div class="panel-hd">
+                    <span class="panel-title">Success Requests</span>
+                    <span class="badge-pill bp-success">SUCCESS</span>
+                </div>
+                <div class="filter-bar">
+                    <span class="filter-bar-label">Filter</span>
+                    <input class="f-input" type="text" id="rf-sip" placeholder="Search by IP address..." oninput="applyReqFilter('s')">
+                    <div class="f-sep"></div>
+                    <select class="f-select" id="rf-sep" onchange="applyReqFilter('s')">
+                        <option value="">All Endpoints</option>
+                        <option value="/api/auth/login">Login</option>
+                        <option value="/api/exam/submit">Submit Exam</option>
+                        <option value="/api/result">Result</option>
+                    </select>
+                    <span class="f-count" id="rc-s">0 records</span>
+                </div>
+                <div class="tbl-wrap"><table>
+                    <thead><tr><th>IP Address</th><th>Endpoint</th><th>Method</th><th>Time</th></tr></thead>
+                    <tbody id="tb-sreq"><tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                </table></div>
+            </div>
+
+            <!-- Failed requests -->
+            <div class="panel">
+                <div class="panel-hd">
+                    <span class="panel-title">Failed Requests</span>
+                    <span class="badge-pill bp-critical">FAILED</span>
+                </div>
+                <div class="filter-bar">
+                    <span class="filter-bar-label">Filter</span>
+                    <input class="f-input" type="text" id="rf-fip" placeholder="Search by IP address..." oninput="applyReqFilter('f')">
+                    <div class="f-sep"></div>
+                    <select class="f-select" id="rf-fep" onchange="applyReqFilter('f')">
+                        <option value="">All Endpoints</option>
+                        <option value="/api/auth/login">Login</option>
+                        <option value="/api/answer-key/download">Answer Key (Honeypot)</option>
+                        <option value="/api/exam/question-paper">Question Paper (Honeypot)</option>
+                        <option value="/api/exam/submit">Submit Exam</option>
+                        <option value="/api/result">Result</option>
+                    </select>
+                    <span class="f-count" id="rc-f">0 records</span>
+                </div>
+                <div class="tbl-wrap"><table>
+                    <thead><tr><th>IP Address</th><th>Endpoint</th><th>Method</th><th>Time</th></tr></thead>
+                    <tbody id="tb-freq"><tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                </table></div>
+            </div>
+        </div>
+
+        <!-- ══════ BLOCKED IPs ══════ -->
+        <div class="page" id="page-blocked">
+            <div class="page-hdr"><div><div class="page-title">Blocked IPs</div><div class="page-sub">Select a row to unblock — active blocks shown by default</div></div></div>
+
+            <!-- UNBLOCK BOX ON TOP -->
+            <div class="unblock-box">
+                <div class="unblock-left">
+                    <div>
+                        <div class="unblock-lbl">Selected IP to Unblock</div>
+                        <span class="unblock-ip" id="ub-ip">— Select a row below —</span>
+                    </div>
+                </div>
+                <div class="unblock-right">
+                    <button class="btn-unblock" id="ub-btn" onclick="unblockSelected()" disabled>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        Unblock IP
+                    </button>
+                    <span class="unblock-msg" id="ub-msg"></span>
+                </div>
+            </div>
+
+            <!-- BLOCKED TABLE BELOW -->
+            <div class="panel">
+                <div class="panel-hd">
+                    <span class="panel-title">Blocked IP List</span>
+                    <span class="badge-pill bp-accent" id="ub-active-cnt">0 Active</span>
+                </div>
+                <div class="filter-bar">
+                    <span class="filter-bar-label">Filter</span>
+                    <input class="f-input" type="text" id="bf-ip" placeholder="Search by IP address..." oninput="applyBlockedFilter()">
+                    <div class="f-sep"></div>
+                    <select class="f-select" id="bf-status" onchange="applyBlockedFilter()">
+                        <option value="ACTIVE">Active Only</option>
+                        <option value="">All Records</option>
+                        <option value="EXPIRED">Expired Only</option>
+                    </select>
+                    <span class="f-count" id="bc-count">0 records</span>
+                </div>
+                <div class="tbl-wrap"><table>
+                    <thead><tr><th>IP Address</th><th>Blocked Till</th><th>Status</th></tr></thead>
+                    <tbody id="tb-blocked"><tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                </table></div>
+            </div>
+        </div>
+
+        <!-- ══════ SECURITY ALERTS ══════ -->
+        <div class="page" id="page-security">
+            <div class="page-hdr"><div><div class="page-title">Security Alerts</div><div class="page-sub">All detected threat events</div></div></div>
+
+            <div class="grid-2">
+                <!-- By Attack Type -->
+                <div class="panel">
+                    <div class="panel-hd"><span class="panel-title">By Attack Type</span></div>
+                    <div class="filter-bar">
+                        <span class="filter-bar-label">Filter</span>
+                        <select class="f-select" id="af-type" onchange="applyAlertFilter()">
+                            <option value="">All Types</option>
+                            <option value="HONEYPOT">Honeypot</option>
+                            <option value="BRUTE FORCE">Brute Force</option>
+                            <option value="RATE LIMIT ATTACK">Rate Limit</option>
+                        </select>
+                        <span class="f-count" id="ac-type">0 records</span>
+                    </div>
+                    <div class="tbl-wrap"><table>
+                        <thead><tr><th>IP Address</th><th>Attack Type</th><th>Time</th></tr></thead>
+                        <tbody id="tb-atype"><tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                    </table></div>
+                </div>
+
+                <!-- By Severity -->
+                <div class="panel">
+                    <div class="panel-hd"><span class="panel-title">By Severity</span></div>
+                    <div class="filter-bar">
+                        <span class="filter-bar-label">Filter</span>
+                        <select class="f-select" id="af-sev" onchange="applyAlertFilter()">
+                            <option value="">All Severity</option>
+                            <option value="CRITICAL">Critical</option>
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM">Medium</option>
+                        </select>
+                        <span class="f-count" id="ac-sev">0 records</span>
+                    </div>
+                    <div class="tbl-wrap"><table>
+                        <thead><tr><th>IP Address</th><th>Severity</th><th>Time</th></tr></thead>
+                        <tbody id="tb-asev"><tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                    </table></div>
+                </div>
+            </div>
+
+            <!-- Harmful Endpoints full width -->
+            <div class="panel">
+                <div class="panel-hd"><span class="panel-title">Most Useful Endpoint Activity</span></div>
+                <div class="filter-bar">
+                    <span class="filter-bar-label">Filter</span>
+                    <input class="f-input" type="text" id="af-ip" placeholder="Search by IP address..." oninput="applyAlertFilter()">
+                    <div class="f-sep"></div>
+                    <select class="f-select" id="af-sev2" onchange="applyAlertFilter()">
+                        <option value="">All Severity</option>
+                        <option value="CRITICAL">Critical</option>
+                        <option value="HIGH">High</option>
+                        <option value="MEDIUM">Medium</option>
+                    </select>
+                    <div class="f-sep"></div>
+                    <select class="f-select" id="af-type2" onchange="applyAlertFilter()">
+                        <option value="">All Types</option>
+                        <option value="HONEYPOT">Honeypot</option>
+                        <option value="BRUTE FORCE">Brute Force</option>
+                        <option value="RATE LIMIT ATTACK">Rate Limit</option>
+                    </select>
+                    <span class="f-count" id="ac-ep">0 records</span>
+                </div>
+                <div class="tbl-wrap"><table>
+                    <thead><tr><th>IP Address</th><th>Endpoint</th><th>Attack Type</th><th>Severity</th><th>Time</th></tr></thead>
+                    <tbody id="tb-aep"><tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                </table></div>
+            </div>
+        </div>
+
+        <!-- ══════ GEO MAP ══════ -->
+        <div class="page" id="page-geomap">
+            <div class="page-hdr">
+                <div><div class="page-title">Geo Map</div><div class="page-sub">Attack origins visualized on world map</div></div>
+                <div style="display:flex;gap:10px;align-items:center;font-size:11px;color:var(--muted);">
+                    <span><span style="color:#ef4444">●</span> Critical</span>
+                    <span><span style="color:#f97316">●</span> High</span>
+                    <span><span style="color:#eab308">●</span> Medium</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-hd">
+                    <span class="panel-title">World Map — Attack Origins</span>
+                    <div class="map-controls">
+                        <button class="map-btn active-map" onclick="zoomIndia(this)">🇮🇳 India</button>
+                        <button class="map-btn" onclick="zoomWorld(this)">🌍 World</button>
+                        <span class="badge-pill bp-accent" id="geo-badge">0 IPs</span>
+                    </div>
+                </div>
+                <div class="map-wrap"><div id="leaflet-map"></div></div>
+            </div>
+
+            <!-- Geo table with filters -->
+            <div class="panel">
+                <div class="panel-hd"><span class="panel-title">IP Location Details</span></div>
+                <div class="filter-bar">
+                    <span class="filter-bar-label">Filter</span>
+                    <input class="f-input" type="text" id="gf-ip" placeholder="Search by IP or country..." oninput="applyGeoFilter()">
+                    <div class="f-sep"></div>
+                    <select class="f-select" id="gf-sev" onchange="applyGeoFilter()">
+                        <option value="">All Severity</option>
+                        <option value="CRITICAL">Critical</option>
+                        <option value="HIGH">High</option>
+                        <option value="MEDIUM">Medium</option>
+                    </select>
+                    <div class="f-sep"></div>
+                    <select class="f-select" id="gf-type" onchange="applyGeoFilter()">
+                        <option value="">All Types</option>
+                        <option value="HONEYPOT">Honeypot</option>
+                        <option value="BRUTE FORCE">Brute Force</option>
+                        <option value="RATE LIMIT ATTACK">Rate Limit</option>
+                    </select>
+                    <span class="f-count" id="gc-count">0 records</span>
+                </div>
+                <div class="tbl-wrap"><table>
+                    <thead><tr><th>IP Address</th><th>Country</th><th>City</th><th>ISP</th><th>Attack Type</th><th>Severity</th></tr></thead>
+                    <tbody id="tb-geo"><tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr></tbody>
+                </table></div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    // ══════════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════════
+    const $ = id => document.getElementById(id);
+    const sevBadge = s => s==='CRITICAL'?'b-critical':s==='HIGH'?'b-high':'b-medium';
+    const sevColor = s => s==='CRITICAL'?'#ef4444':s==='HIGH'?'#f97316':'#eab308';
+    const fmtTime  = t => new Date(t).toLocaleTimeString();
+    const noRow    = (cols,msg) => `<tr><td colspan="${cols}" style="color:var(--muted);text-align:center;padding:18px;font-size:11px">${msg}</td></tr>`;
+
+    // ══════════════════════════════════════════
+    // LOGIN
+    // ══════════════════════════════════════════
+    function doLogin(){
+      const u=$('lu').value.trim(), p=$('lp').value.trim();
+      if(u==='admin'&&p==='admin123'){
+        $('login-page').style.display='none';
+        $('app').style.display='flex';
+        $('admin-name').textContent=u;
+        $('admin-ava').textContent=u[0].toUpperCase();
+        $('lerr').style.display='none';
+        initDashboard(); startAutoRefresh();
+      } else { $('lerr').style.display='block'; }
+    }
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&$('login-page').style.display!=='none') doLogin();
+    });
+
+    // ══════════════════════════════════════════
+    // NAVIGATION
+    // ══════════════════════════════════════════
+    function showPage(name,btn){
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      $('page-'+name).classList.add('active');
+      btn.classList.add('active');
+      if(name==='geomap') renderGeoMap();
+    }
+
+    // ══════════════════════════════════════════
+    // CLOCK
+    // ══════════════════════════════════════════
+    setInterval(()=>{ const e=$('clock'); if(e) e.textContent=new Date().toLocaleTimeString(); },1000);
+
+    // ══════════════════════════════════════════
+    // DASHBOARD
+    // ══════════════════════════════════════════
+    function initDashboard(){
+      renderStats(); renderRecentBlocked(); renderTopEndpoints(); initCharts();
+    }
+
+    function renderStats(){
+      fetch('/admin/stats').then(r=>r.json()).then(d=>{
+        $('s-req').textContent=d.totalRequests.toLocaleString();
+        $('s-fail').textContent=d.failedRequests.toLocaleString();
+        $('s-alert').textContent=d.activeAlerts.toLocaleString();
+        $('s-block').textContent=d.blockedIps.toLocaleString();
+      }).catch(()=>{});
+    }
+
+    function renderRecentBlocked(){
+      fetch('/admin/recent-blocked').then(r=>r.json()).then(data=>{
+        const tb=$('tb-recent');
+        if(!data.length){ tb.innerHTML=noRow(3,'No blocked IPs'); return; }
+        tb.innerHTML=data.map(b=>{
+          const active=new Date(b.blockedTill)>new Date();
+          return `<tr>
+            <td class="ip-mono">${b.ip}</td>
+            <td class="tdim">${new Date(b.blockedTill).toLocaleTimeString()}</td>
+            <td><span class="badge ${active?'b-success':'b-muted'}">${active?'● Active':'Expired'}</span></td>
+          </tr>`;
+        }).join('');
+      }).catch(()=>{});
+    }
+
+    function renderTopEndpoints(){
+      fetch('/admin/top-endpoints').then(r=>r.json()).then(data=>{
+        if(!data.length) return;
+        const max=data[0].count;
+        $('ep-list').innerHTML=data.map(e=>`
+          <div class="ep-row">
+            <span class="ep-name">${e.name}</span>
+            <div class="ep-track"><div class="ep-fill" style="width:${(e.count/max)*100}%"></div></div>
+            <span class="ep-num">${e.count}</span>
+          </div>`).join('');
+      }).catch(()=>{});
+    }
+
+    // ══════════════════════════════════════════
+    // CHARTS
+    // ══════════════════════════════════════════
+    let reqChart=null, epChart=null;
+    const chartOpts=(xlabel)=>({
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{color:'#1a2236'},ticks:{color:'#5a6d94',font:{size:8}}},
+        y:{grid:{color:'#1a2236'},ticks:{color:'#5a6d94',font:{size:8}}}
+      }
+    });
+
+    function initCharts(){
+      fetch('/admin/requests-per-minute').then(r=>r.json()).then(d=>{
+        const ctx=$('reqChart').getContext('2d');
+        if(reqChart) reqChart.destroy();
+        reqChart=new Chart(ctx,{type:'line',data:{
+          labels:d.map(r=>r.minute),
+          datasets:[{data:d.map(r=>r.count),borderColor:'#4269f5',backgroundColor:'rgba(66,105,245,0.07)',borderWidth:2,pointRadius:2.5,pointBackgroundColor:'#4269f5',fill:true,tension:0.4}]
+        },options:chartOpts()});
+      }).catch(()=>{});
+
+      fetch('/admin/top-endpoints').then(r=>r.json()).then(d=>{
+        const ctx=$('epChart').getContext('2d');
+        if(epChart) epChart.destroy();
+        epChart=new Chart(ctx,{type:'bar',data:{
+          labels:d.map(e=>e.name.substring(0,10)),
+          datasets:[{data:d.map(e=>e.count),backgroundColor:['#4269f5','#ef4444','#f97316','#22c55e','#eab308'],borderRadius:4}]
+        },options:chartOpts()});
+      }).catch(()=>{});
+    }
+
+    // ══════════════════════════════════════════
+    // REQUESTS PAGE
+    // ══════════════════════════════════════════
+    let reqData=[];
+
+    function renderRequestsTable(){
+      fetch('/admin/requests').then(r=>r.json()).then(d=>{
+        reqData=d; applyReqFilter('s'); applyReqFilter('f');
+      }).catch(()=>{});
+    }
+
+    function applyReqFilter(t){
+      const ip   =$(`rf-${t}ip`)?.value.toLowerCase()||'';
+      const ep   =$(`rf-${t}ep`)?.value||'';
+      const stat =t==='s'?'SUCCESS':'FAILED';
+      const rows =reqData.filter(r=>r.status===stat&&(ip===''||r.ip.toLowerCase().includes(ip))&&(ep===''||r.endpoint.includes(ep)));
+      const tbody=t==='s'?'tb-sreq':'tb-freq';
+      const cnt  =t==='s'?'rc-s':'rc-f';
+      $(cnt).textContent=`${rows.length} records`;
+      $(tbody).innerHTML=rows.length
+        ? rows.map(r=>`<tr>
+            <td class="ip-mono">${r.ip}</td>
+            <td class="ep-mono">${r.endpoint}</td>
+            <td class="tdim">${r.method}</td>
+            <td class="tdim">${fmtTime(r.time)}</td>
+          </tr>`).join('')
+        : noRow(4,'No records found');
+    }
+
+    // ══════════════════════════════════════════
+    // BLOCKED IP PAGE
+    // ══════════════════════════════════════════
+    let blockedData=[], selIp=null;
+
+    function renderBlockedTable(){
+      fetch('/admin/blocked-ips').then(r=>r.json()).then(d=>{
+        blockedData=d;
+        const active=d.filter(b=>b.status==='ACTIVE').length;
+        $('ub-active-cnt').textContent=`${active} Active`;
+        applyBlockedFilter();
+      }).catch(()=>{});
+    }
+
+    function applyBlockedFilter(){
+      const ip  =$('bf-ip').value.toLowerCase();
+      const stat=$('bf-status').value;
+      const rows=blockedData.filter(b=>(ip===''||b.ip.toLowerCase().includes(ip))&&(stat===''||b.status===stat));
+      $('bc-count').textContent=`${rows.length} records`;
+      if(!rows.length){ $('tb-blocked').innerHTML=noRow(3,'No records found'); return; }
+      $('tb-blocked').innerHTML=rows.map(b=>{
+        const oi=blockedData.indexOf(b);
+        return `<tr id="br-${oi}" onclick="selectBlocked(${oi},'${b.ip}','${b.status}')">
+          <td class="ip-mono">${b.ip}</td>
+          <td class="tdim">${new Date(b.blockedTill).toLocaleString()}</td>
+          <td><span class="badge ${b.status==='ACTIVE'?'b-success':'b-muted'}">${b.status==='ACTIVE'?'● Active':'Expired'}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function selectBlocked(idx,ip,status){
+      document.querySelectorAll('#tb-blocked tr').forEach(r=>r.classList.remove('row-sel'));
+      const row=$('br-'+idx); if(row) row.classList.add('row-sel');
+      selIp=ip; $('ub-ip').textContent=ip;
+      const btn=$('ub-btn'), msg=$('ub-msg');
+      if(status==='ACTIVE'){
+        btn.disabled=false; msg.textContent='';
+      } else {
+        btn.disabled=true;
+        msg.textContent='Already expired'; msg.style.color='var(--muted)';
+      }
+    }
+
+    function unblockSelected(){
+      if(!selIp) return;
+      fetch('/admin/unblock/'+selIp,{method:'POST'}).then(r=>r.text()).then(res=>{
+        const msg=$('ub-msg'), btn=$('ub-btn');
+        if(res==='UNBLOCKED'){
+          msg.textContent='✓ '+selIp+' unblocked'; msg.style.color='var(--success)';
+          btn.disabled=true; selIp=null;
+          $('ub-ip').textContent='— Select a row below —';
+          renderBlockedTable(); renderRecentBlocked(); renderStats();
+        } else { msg.textContent='Error unblocking'; msg.style.color='var(--critical)'; }
+      }).catch(()=>{ $('ub-msg').textContent='Request failed'; $('ub-msg').style.color='var(--critical)'; });
+    }
+
+    // ══════════════════════════════════════════
+    // SECURITY ALERTS PAGE
+    // ══════════════════════════════════════════
+    let alertsData=[];
+
+    function renderAlertsTable(){
+      fetch('/admin/alerts').then(r=>r.json()).then(d=>{
+        alertsData=d; applyAlertFilter();
+      }).catch(()=>{});
+    }
+
+    function applyAlertFilter(){
+      const type =$('af-type').value;
+      const sev  =$('af-sev').value;
+      const ip   =$('af-ip').value.toLowerCase();
+      const sev2 =$('af-sev2').value;
+      const type2=$('af-type2').value;
+
+      // Attack Type table
+      const tRows=alertsData.filter(a=>type===''||a.attackType===type);
+      $('ac-type').textContent=`${tRows.length} records`;
+      $('tb-atype').innerHTML=tRows.length
+        ? tRows.map(a=>`<tr><td class="ip-mono">${a.ip}</td><td style="font-size:11px">${a.attackType}</td><td class="tdim">${fmtTime(a.time)}</td></tr>`).join('')
+        : noRow(3,'No records');
+
+      // Severity table
+      const sRows=alertsData.filter(a=>sev===''||a.severity===sev);
+      $('ac-sev').textContent=`${sRows.length} records`;
+      $('tb-asev').innerHTML=sRows.length
+        ? sRows.map(a=>`<tr><td class="ip-mono">${a.ip}</td><td><span class="badge ${sevBadge(a.severity)}">${a.severity}</span></td><td class="tdim">${fmtTime(a.time)}</td></tr>`).join('')
+        : noRow(3,'No records');
+
+      // Harmful endpoints table
+      const eRows=alertsData.filter(a=>
+        (ip===''||a.ip.toLowerCase().includes(ip))&&
+        (sev2===''||a.severity===sev2)&&
+        (type2===''||a.attackType===type2)
+      );
+      $('ac-ep').textContent=`${eRows.length} records`;
+      $('tb-aep').innerHTML=eRows.length
+        ? eRows.map(a=>`<tr>
+            <td class="ip-mono">${a.ip}</td>
+            <td class="ep-mono">${a.endpoint}</td>
+            <td style="font-size:11px">${a.attackType}</td>
+            <td><span class="badge ${sevBadge(a.severity)}">${a.severity}</span></td>
+            <td class="tdim">${fmtTime(a.time)}</td>
+          </tr>`).join('')
+        : noRow(5,'No records');
+    }
+
+    // ══════════════════════════════════════════
+    // GEO MAP
+    // ══════════════════════════════════════════
+    let leafletMap=null, leafletMarkers=[], geoData=[];
+
+    function renderGeoMap(){
+      if(!leafletMap){
+        leafletMap=L.map('leaflet-map',{center:[22.5,82.0],zoom:5});
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+          attribution:'© OpenStreetMap © CARTO',maxZoom:18
+        }).addTo(leafletMap);
+      }
+      fetch('/admin/geo-alerts').then(r=>r.json()).then(data=>{
+        geoData=data;
+        $('geo-badge').textContent=data.length+' IPs';
+        leafletMarkers.forEach(m=>{if(m)m.remove();}); leafletMarkers=[];
+        data.forEach((d,idx)=>{
+          if(d.lat!=null&&d.lng!=null){
+            const col=sevColor(d.severity);
+            const r=d.severity==='CRITICAL'?14:d.severity==='HIGH'?11:8;
+            const m=L.circleMarker([d.lat,d.lng],{radius:r,fillColor:col,color:col,weight:2,opacity:0.9,fillOpacity:0.6}).addTo(leafletMap);
+            m.bindPopup(`<div class="mp-ip">${d.ip}</div>
+              <div class="mp-row">Country: <span>${d.country}</span></div>
+              <div class="mp-row">City: <span>${d.city}</span></div>
+              <div class="mp-row">ISP: <span>${d.isp}</span></div>
+              <div class="mp-row">Attack: <span>${d.attackType}</span></div>
+              <div class="mp-row">Severity: <span style="color:${col}">${d.severity}</span></div>`,{maxWidth:220});
+            m.on('click',()=>highlightGeoRow(idx));
+            leafletMarkers.push(m);
+          } else { leafletMarkers.push(null); }
+        });
+        applyGeoFilter();
+      }).catch(()=>{});
+    }
+
+    function applyGeoFilter(){
+      const ip  =$('gf-ip')?.value.toLowerCase()||'';
+      const sev =$('gf-sev')?.value||'';
+      const type=$('gf-type')?.value||'';
+      const rows=geoData.filter(d=>
+        (ip===''||d.ip.toLowerCase().includes(ip)||(d.country||'').toLowerCase().includes(ip))&&
+        (sev===''||d.severity===sev)&&
+        (type===''||d.attackType===type)
+      );
+      $('gc-count').textContent=`${rows.length} records`;
+      const tb=$('tb-geo');
+      if(!rows.length){ tb.innerHTML=noRow(6,'No records found'); return; }
+      tb.innerHTML=rows.map(d=>{
+        const oi=geoData.indexOf(d);
+        return `<tr id="gr-${oi}" onclick="selectGeoRow(${oi})" style="cursor:pointer">
+          <td class="ip-mono">${d.ip}</td>
+          <td>${d.country}</td>
+          <td class="tdim">${d.city}</td>
+          <td class="tdim" style="font-size:10px">${d.isp}</td>
+          <td style="font-size:11px">${d.attackType}</td>
+          <td><span class="badge ${sevBadge(d.severity)}">${d.severity}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function selectGeoRow(idx){
+      const d=geoData[idx]; if(!d) return;
+      highlightGeoRow(idx);
+      if(d.lat!=null&&d.lng!=null){
+        leafletMap.flyTo([d.lat,d.lng],10,{animate:true,duration:1.2});
+        setTimeout(()=>leafletMarkers[idx]?.openPopup(),800);
+      }
+    }
+
+    function highlightGeoRow(idx){
+      document.querySelectorAll('#tb-geo tr').forEach(r=>r.classList.remove('geo-sel'));
+      $('gr-'+idx)?.classList.add('geo-sel');
+    }
+
+    function zoomIndia(btn){
+      leafletMap?.flyTo([22.5,82.0],5,{animate:true,duration:1});
+      document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('active-map'));
+      btn.classList.add('active-map');
+    }
+    function zoomWorld(btn){
+      leafletMap?.flyTo([20,0],2,{animate:true,duration:1});
+      document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('active-map'));
+      btn.classList.add('active-map');
+    }
+
+    // ══════════════════════════════════════════
+    // AUTO REFRESH — every 5 seconds
+    // ══════════════════════════════════════════
+    function startAutoRefresh(){
+      setInterval(()=>{
+        renderStats(); renderRecentBlocked();
+        renderBlockedTable(); renderRequestsTable(); renderAlertsTable();
+        if($('page-geomap').classList.contains('active')) renderGeoMap();
+      },5000);
+    }
+</script>
+</body>
+</html>
