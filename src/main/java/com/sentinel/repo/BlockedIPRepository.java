@@ -8,7 +8,8 @@ import java.util.List;
 
 public interface BlockedIPRepository extends JpaRepository<BlockedIp, Long> {
 
-    long countByBlockedTillAfter(LocalDateTime localDateTime);
+    @Query("SELECT COUNT(b) FROM BlockedIp b WHERE b.blockedTill > CURRENT_TIMESTAMP")
+    long countActiveBlocked();
 
     // Top 5 recently blocked IPs
     List<BlockedIp> findTop5ByOrderByBlockedTillDesc();

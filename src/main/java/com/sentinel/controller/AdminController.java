@@ -45,7 +45,7 @@ public class AdminController {
         long totalRequest=requestLogRepo.count();
         long failedRequest=requestLogRepo.countByStatus("FAILED");
         long activeAlert=alertRepo.count();
-        long blockedIp=blockedRepo.countByBlockedTillAfter(LocalDateTime.now());
+        long blockedIp=blockedRepo.countActiveBlocked();
 
         return new DashboardStatsDTO(totalRequest,failedRequest,activeAlert,blockedIp);
     }
