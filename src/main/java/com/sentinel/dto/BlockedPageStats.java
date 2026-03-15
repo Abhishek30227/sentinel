@@ -3,7 +3,6 @@ package com.sentinel.dto;
 import com.sentinel.module.BlockedIp;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 public class BlockedPageStats {
     private String ip;
@@ -13,7 +12,7 @@ public class BlockedPageStats {
     public BlockedPageStats(BlockedIp newBlock) {
         this.ip = newBlock.getIp();
         this.blockedTill = newBlock.getBlockedTill();
-        this.status = newBlock.getBlockedTill().isAfter(LocalDateTime.now(ZoneOffset.UTC))
+        this.status = newBlock.getBlockedTill().isAfter(LocalDateTime.now())
                 ? "ACTIVE" : "EXPIRED";
     }
 

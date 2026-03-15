@@ -14,7 +14,6 @@ import com.sentinel.repo.SecurityAlertRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -61,8 +60,13 @@ public class AdminController {
     }
 
     @GetMapping("/recent-blocked")
-    public List<BlockedIp> getRecentBlocked() {
-        return blockedRepo.findTop5ByOrderByBlockedTillDesc();
+    public List<BlockedPageStats> getRecentBlocked() {
+        List<BlockedIp> list = blockedRepo.findTop5ByOrderByBlockedTillDesc();
+        List<BlockedPageStats> result = new ArrayList<>();
+        for (BlockedIp b : list) {
+            result.add(new BlockedPageStats(b));
+        }
+        return result;
     }
 
     @GetMapping("/blocked-ips")
@@ -79,8 +83,7 @@ public class AdminController {
     public String unBlockIP(@PathVariable String ip) {
         BlockedIp block = blockedRepo.findTopByIpOrderByBlockedTillDesc(ip);
         if (block != null) {
-            // UTC time use karo
-            block.setBlockedTill(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+            block.setBlockedTill(LocalDateTime.now().minusMinutes(1));
             blockedRepo.save(block);
             return "UNBLOCKED";
         }

@@ -7,10 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Service
 public class RequestLogService {
+
     @Autowired
     RequestLogRepository repo;
 
@@ -24,7 +24,7 @@ public class RequestLogService {
         log.setEndpoint(endpoint);
         log.setMethod(method);
         log.setStatus(status);
-        log.setTime(LocalDateTime.now(ZoneOffset.UTC));  // UTC fix
+        log.setTime(LocalDateTime.now());
         repo.save(log);
     }
 

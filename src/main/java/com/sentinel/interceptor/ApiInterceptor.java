@@ -11,7 +11,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Component
 public class ApiInterceptor implements HandlerInterceptor {
@@ -36,11 +35,9 @@ public class ApiInterceptor implements HandlerInterceptor {
 
         String ip = request.getRemoteAddr();
         String endpoint = request.getRequestURI();
-        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        LocalDateTime now = LocalDateTime.now();
 
-        // =====================================================
         // STEP 1 : HONEYPOT CHECK
-        // =====================================================
         if (endpoint.equals(HONEYPOT_1) || endpoint.equals(HONEYPOT_2)) {
             BlockedIp block = new BlockedIp();
             block.setIp(ip);
@@ -55,9 +52,7 @@ public class ApiInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // =====================================================
         // STEP 2 : BLOCKED IP CHECK
-        // =====================================================
         BlockedIp blocked = blockService.findByIp(ip);
         if (blocked != null && blocked.getBlockedTill().isAfter(now)) {
             response.setStatus(403);
@@ -66,9 +61,7 @@ public class ApiInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // =====================================================
         // STEP 3 : BRUTE FORCE CHECK
-        // =====================================================
         if (endpoint.equals("/api/auth/login")) {
             long failedCount = logService.countFailedLoginAttempts(ip, "/api/auth/login", now.minusMinutes(10));
             if (failedCount >= 5) {
@@ -87,9 +80,7 @@ public class ApiInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // =====================================================
         // STEP 4 : RATE LIMIT CHECK
-        // =====================================================
         long count = logService.countRecentRequestsByEndpoint(ip, endpoint, now.minusMinutes(1));
         if (count >= LIMIT) {
             BlockedIp newBlock = new BlockedIp();
@@ -105,9 +96,7 @@ public class ApiInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // =====================================================
         // STEP 5 : NORMAL REQUEST SAVE
-        // =====================================================
         if (!endpoint.equals("/api/auth/login")) {
             logService.requestLog(ip, endpoint, request.getMethod(), "SUCCESS");
         }
