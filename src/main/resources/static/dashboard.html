@@ -685,20 +685,25 @@
       }).catch(()=>{});
     }
 
-    function renderRecentBlocked(){
-      fetch('/admin/recent-blocked').then(r=>r.json()).then(data=>{
-        const tb=$('tb-recent');
-        if(!data.length){ tb.innerHTML=noRow(3,'No blocked IPs'); return; }
-        tb.innerHTML=data.map(b=>{
-          const active=new Date(b.blockedTill)>new Date();
-          return `<tr>
-            <td class="ip-mono">${b.ip}</td>
-            <td class="tdim">${new Date(b.blockedTill).toLocaleTimeString()}</td>
-            <td><span class="badge ${active?'b-success':'b-muted'}">${active?'● Active':'Expired'}</span></td>
-          </tr>`;
-        }).join('');
-      }).catch(()=>{});
-    }
+    function renderRecentBlocked() {
+    fetch('/admin/recent-blocked')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('recent-blocked-tbody');
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:16px">No blocked IPs</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(b => {
+                const isActive = b.status === 'ACTIVE';
+                return `<tr>
+                    <td class="ip-mono">${b.ip}</td>
+                    <td class="tdim">${b.blockedTill}</td>
+                    <td><span class="badge ${isActive ? 'b-success' : 'b-muted'}">${isActive ? '● Active' : 'Expired'}</span></td>
+                </tr>`;
+            }).join('');
+        }).catch(() => {});
+}
 
     function renderTopEndpoints(){
       fetch('/admin/top-endpoints').then(r=>r.json()).then(data=>{
