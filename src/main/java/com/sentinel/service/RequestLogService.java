@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Service
 public class RequestLogService {
@@ -16,18 +17,14 @@ public class RequestLogService {
     @Autowired
     BlockService blockService;
 
-    //***************************METHOD TO SAVE REQUEST LOG IN INTERCEPTOR**************************
-
     public void requestLog(String ip, String endpoint,
-                    String method, String status) {
-
+                           String method, String status) {
         RequestLog log = new RequestLog();
         log.setIp(ip);
         log.setEndpoint(endpoint);
         log.setMethod(method);
         log.setStatus(status);
-        log.setTime(LocalDateTime.now());
-
+        log.setTime(LocalDateTime.now(ZoneOffset.UTC));  // UTC fix
         repo.save(log);
     }
 
@@ -35,11 +32,6 @@ public class RequestLogService {
         return repo.countByIpAndEndpointAndStatusAndTimeAfter(ip, endpoint, "FAILED", since);
     }
 
-    //***************************METHODS REQUIRE BY INTERCEPTOR***********************************
-
-
-    // Shift the rate limit window to after the last block time
-    // so previous blocked requests are not counted again
     public long countRecentRequestsByEndpoint(String ip, String endpoint, LocalDateTime since) {
         BlockedIp lastBlock = blockService.findByIp(ip);
         if (lastBlock != null && lastBlock.getBlockedAt() != null) {
@@ -49,9 +41,4 @@ public class RequestLogService {
         }
         return repo.countByIpAndEndpointAndStatusAndTimeAfter(ip, endpoint, "SUCCESS", since);
     }
-
-
-
-
-
 }

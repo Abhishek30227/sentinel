@@ -14,6 +14,7 @@ import com.sentinel.repo.SecurityAlertRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +29,6 @@ public class AdminController {
     private final BlockedIPRepository blockedRepo;
     private final IpLocationRepository ipLocationRepo;
 
-    // Constructor injection
     public AdminController(RequestLogRepository requestLogRepo,
                            BlockedIPRepository blockedRepo,
                            SecurityAlertRepository securityAlertRepository,
@@ -40,28 +40,23 @@ public class AdminController {
     }
 
     @GetMapping("/stats")
-    public DashboardStatsDTO getStats(){
-
-        long totalRequest=requestLogRepo.count();
-        long failedRequest=requestLogRepo.countByStatus("FAILED");
-        long activeAlert=alertRepo.count();
-        long blockedIp=blockedRepo.countActiveBlocked();
-
-        return new DashboardStatsDTO(totalRequest,failedRequest,activeAlert,blockedIp);
+    public DashboardStatsDTO getStats() {
+        long totalRequest  = requestLogRepo.count();
+        long failedRequest = requestLogRepo.countByStatus("FAILED");
+        long activeAlert   = alertRepo.count();
+        long blockedIp     = blockedRepo.countActiveBlocked();
+        return new DashboardStatsDTO(totalRequest, failedRequest, activeAlert, blockedIp);
     }
 
     @GetMapping("/requests-per-minute")
-    public List<RequestPerMinDto> getRPM(){
-
+    public List<RequestPerMinDto> getRPM() {
         List<RequestPerMinDto> requestPerMinDtos = new ArrayList<>();
         List<Object[]> results = requestLogRepo.getLast10MinutesData();
-
         for (Object[] row : results) {
             String minute = (String) row[0];
             Long count    = ((Number) row[1]).longValue();
             requestPerMinDtos.add(new RequestPerMinDto(minute, count));
         }
-
         return requestPerMinDtos;
     }
 
@@ -81,11 +76,11 @@ public class AdminController {
     }
 
     @PostMapping("/unblock/{ip}")
-    public String unBlockIP(@PathVariable String ip){
-
+    public String unBlockIP(@PathVariable String ip) {
         BlockedIp block = blockedRepo.findTopByIpOrderByBlockedTillDesc(ip);
         if (block != null) {
-            block.setBlockedTill(LocalDateTime.now().minusMinutes(1));
+            // UTC time use karo
+            block.setBlockedTill(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1));
             blockedRepo.save(block);
             return "UNBLOCKED";
         }
@@ -102,16 +97,12 @@ public class AdminController {
         return alertRepo.findAllByOrderByTimeDesc();
     }
 
-    // Geo alerts — combines alert data with IP location for map
     @GetMapping("/geo-alerts")
     public List<Map<String, Object>> getGeoAlerts() {
         List<SecurityAlert> alerts = alertRepo.findAllByOrderByTimeDesc();
         List<Map<String, Object>> result = new ArrayList<>();
-
         for (SecurityAlert alert : alerts) {
-            // Get lat/lng from ip_location table
             IpLocation location = ipLocationRepo.findById(alert.getIp()).orElse(null);
-
             Map<String, Object> row = new HashMap<>();
             row.put("ip",         alert.getIp());
             row.put("attackType", alert.getAttackType());
@@ -126,7 +117,6 @@ public class AdminController {
         return result;
     }
 
-    // Top endpoints by request count
     @GetMapping("/top-endpoints")
     public List<Map<String, Object>> getTopEndpoints() {
         List<Object[]> results = requestLogRepo.getTopEndpoints();
@@ -140,4 +130,3 @@ public class AdminController {
         return result;
     }
 }
-
