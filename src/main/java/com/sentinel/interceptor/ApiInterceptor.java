@@ -33,7 +33,13 @@ public class ApiInterceptor implements HandlerInterceptor {
                              HttpServletResponse response,
                              Object handler) throws IOException {
 
-        String ip = request.getRemoteAddr();
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty()) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
         String endpoint = request.getRequestURI();
         LocalDateTime now = LocalDateTime.now();
 
